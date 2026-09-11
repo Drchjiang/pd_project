@@ -1,0 +1,2238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>ICC2 Block 规模与复杂度评估指南</title>
+
+<style>
+:root {
+    --primary: #1a5fb4;
+    --primary-dark: #174a8b;
+    --primary-light: #e8f0fe;
+
+    --success: #188038;
+    --success-bg: #e6f4ea;
+
+    --warning: #b06000;
+    --warning-bg: #fef7e0;
+
+    --danger: #b3261e;
+    --danger-bg: #fce8e6;
+
+    --text: #202124;
+    --muted: #5f6368;
+    --border: #d8dee8;
+    --page-bg: #f5f7fb;
+    --card-bg: #ffffff;
+
+    --code-bg: #1f2329;
+    --code-text: #e6edf3;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    margin: 0;
+    color: var(--text);
+    background: var(--page-bg);
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        "PingFang SC",
+        "Microsoft YaHei",
+        Arial,
+        sans-serif;
+    line-height: 1.72;
+}
+
+header {
+    padding: 44px 20px;
+    color: #ffffff;
+    background: linear-gradient(135deg, #174a8b, #4285f4);
+}
+
+.container {
+    width: min(1280px, calc(100% - 32px));
+    margin: 0 auto;
+}
+
+header h1 {
+    margin: 0 0 12px;
+    font-size: clamp(28px, 4vw, 42px);
+}
+
+header p {
+    max-width: 1050px;
+    margin: 6px 0;
+    opacity: 0.96;
+}
+
+main {
+    padding: 26px 0 52px;
+}
+
+h2 {
+    margin: 38px 0 18px;
+    padding-bottom: 9px;
+    color: var(--primary-dark);
+    border-bottom: 2px solid var(--primary-light);
+}
+
+h3 {
+    margin-top: 24px;
+    color: var(--primary-dark);
+}
+
+h4 {
+    color: #285d98;
+}
+
+a {
+    color: var(--primary);
+}
+
+.card {
+    margin: 18px 0;
+    padding: 20px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 2px 9px rgba(30, 50, 80, 0.06);
+}
+
+.notice {
+    margin: 14px 0;
+    padding: 14px 16px;
+    border-left: 5px solid;
+    border-radius: 8px;
+}
+
+.notice.info {
+    color: #174270;
+    background: var(--primary-light);
+    border-color: var(--primary);
+}
+
+.notice.success {
+    color: #14532d;
+    background: var(--success-bg);
+    border-color: var(--success);
+}
+
+.notice.warning {
+    color: #744400;
+    background: var(--warning-bg);
+    border-color: var(--warning);
+}
+
+.notice.danger {
+    color: #7a1c17;
+    background: var(--danger-bg);
+    border-color: var(--danger);
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+    gap: 14px;
+}
+
+.metric-card {
+    padding: 16px;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--primary);
+    border-radius: 10px;
+}
+
+.metric-card h3 {
+    margin-top: 0;
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 16px 0;
+}
+
+.toolbar input,
+.toolbar select,
+.toolbar button,
+.copy-button {
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid #aeb8c5;
+    border-radius: 8px;
+    background: #ffffff;
+    font-size: 14px;
+}
+
+.toolbar input {
+    flex: 1 1 340px;
+}
+
+.toolbar select {
+    flex: 0 1 230px;
+}
+
+.toolbar button,
+.copy-button {
+    color: #ffffff;
+    background: var(--primary);
+    border-color: var(--primary);
+    cursor: pointer;
+}
+
+.toolbar button:hover,
+.copy-button:hover {
+    background: var(--primary-dark);
+}
+
+.table-wrap {
+    overflow-x: auto;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+table {
+    width: 100%;
+    min-width: 1100px;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    padding: 12px 13px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--border);
+}
+
+th {
+    color: #ffffff;
+    background: var(--primary);
+    white-space: nowrap;
+}
+
+tbody tr:hover td {
+    background: #f7faff;
+}
+
+tbody tr:last-child td {
+    border-bottom: none;
+}
+
+code {
+    padding: 2px 5px;
+    color: #9c1c1c;
+    background: #f0f2f5;
+    border-radius: 4px;
+    font-family: Consolas, Monaco, monospace;
+}
+
+.code-box {
+    position: relative;
+    margin: 14px 0;
+}
+
+pre {
+    overflow-x: auto;
+    margin: 0;
+    padding: 18px;
+    color: var(--code-text);
+    background: var(--code-bg);
+    border-radius: 9px;
+    line-height: 1.55;
+}
+
+pre code {
+    padding: 0;
+    color: inherit;
+    background: transparent;
+}
+
+.copy-button {
+    position: absolute;
+    top: 9px;
+    right: 9px;
+    min-height: 32px;
+    padding: 5px 9px;
+    font-size: 12px;
+}
+
+.badge {
+    display: inline-block;
+    margin: 2px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.badge.safe {
+    color: #116329;
+    background: var(--success-bg);
+}
+
+.badge.warn {
+    color: #7b4800;
+    background: var(--warning-bg);
+}
+
+.badge.danger {
+    color: #8c1d18;
+    background: var(--danger-bg);
+}
+
+.badge.type {
+    color: #174a8b;
+    background: var(--primary-light);
+}
+
+details {
+    margin: 14px 0;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+
+details[open] {
+    box-shadow: 0 2px 8px rgba(30, 50, 80, 0.06);
+}
+
+summary {
+    padding: 15px 18px;
+    color: var(--primary-dark);
+    background: #fbfcff;
+    cursor: pointer;
+    font-weight: 700;
+    border-radius: 10px;
+}
+
+.detail-content {
+    padding: 3px 18px 18px;
+}
+
+.flow {
+    overflow-x: auto;
+    padding: 18px;
+    background: #f8fafc;
+    border: 1px dashed #8f9baa;
+    border-radius: 10px;
+    font-family: Consolas, Monaco, monospace;
+    white-space: pre;
+}
+
+.small {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.hidden {
+    display: none;
+}
+
+footer {
+    padding: 25px 20px;
+    color: #ffffff;
+    background: #263238;
+}
+
+footer p {
+    margin: 4px 0;
+}
+
+@media (max-width: 720px) {
+    .container {
+        width: min(100% - 20px, 1280px);
+    }
+
+    header {
+        padding: 30px 10px;
+    }
+
+    .card {
+        padding: 15px;
+    }
+}
+
+@media print {
+    body {
+        background: #ffffff;
+    }
+
+    header {
+        color: #000000;
+        background: #ffffff;
+        border-bottom: 2px solid #000000;
+    }
+
+    .toolbar,
+    .copy-button {
+        display: none;
+    }
+
+    .card,
+    details {
+        box-shadow: none;
+    }
+
+    th {
+        color: #000000;
+        background: #dddddd;
+    }
+
+    pre {
+        color: #000000;
+        background: #eeeeee;
+        white-space: pre-wrap;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<div class="container">
+    <h1>ICC2 Block 规模与复杂度评估指南</h1>
+
+    <p>
+        使用几何尺寸、Instance 数量、Macro、连接规模、Utilization、
+        Clock、Scenario、多电压域、时序和拥塞等指标，综合评价一个
+        ICC2 Block 的规模与物理实现难度。
+    </p>
+
+    <p>
+        本文同时说明两种使用场景：
+        <strong>只有读取权限</strong>，以及
+        <strong>同时拥有读取和写入权限</strong>。
+    </p>
+</div>
+</header>
+
+<main class="container">
+
+<section class="card">
+    <h2>1. 先理解四种不同操作</h2>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>操作类型</th>
+                    <th>典型命令</th>
+                    <th>是否修改当前数据库</th>
+                    <th>是否写入磁盘</th>
+                    <th>只读 Block 是否适合</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td>查询数据库</td>
+                    <td>
+                        <code>get_cells</code>、
+                        <code>get_attribute</code>、
+                        <code>sizeof_collection</code>
+                    </td>
+                    <td>否</td>
+                    <td>否</td>
+                    <td><span class="badge safe">适合</span></td>
+                </tr>
+
+                <tr>
+                    <td>终端报告</td>
+                    <td>
+                        <code>report_qor</code>、
+                        <code>report_utilization</code>
+                    </td>
+                    <td>否</td>
+                    <td>通常否</td>
+                    <td><span class="badge safe">适合</span></td>
+                </tr>
+
+                <tr>
+                    <td>输出报告文件</td>
+                    <td>
+                        <code>redirect -file ...</code>
+                    </td>
+                    <td>否</td>
+                    <td>是</td>
+                    <td>
+                        <span class="badge warn">
+                            必须输出到可写目录
+                        </span>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>修改当前会话</td>
+                    <td>
+                        <code>read_sdc</code>、
+                        <code>read_def</code>、
+                        <code>source</code>、
+                        placement/routing 命令
+                    </td>
+                    <td>是</td>
+                    <td>未必立即写入</td>
+                    <td>
+                        <span class="badge danger">
+                            不适合只读分析
+                        </span>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>保存数据库</td>
+                    <td>
+                        <code>save_block</code>、
+                        <code>save_lib</code>
+                    </td>
+                    <td>把当前状态持久化</td>
+                    <td>是</td>
+                    <td>
+                        <span class="badge danger">
+                            只读 Block 禁止
+                        </span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="notice info">
+        <strong>关键点：</strong>
+        Linux 目录可写、ICC2 Library 可写、ICC2 Block 可写，是三个不同概念。
+        即使 Linux 目录可写，也不一定表示当前 Block 可以保存。
+    </div>
+</section>
+
+<section>
+    <h2>2. 只有读取权限时应该怎样做</h2>
+
+    <div class="notice success">
+        查询 Block 属性、统计对象数量、执行原生报告，并在终端显示结果，
+        通常不需要 Block 写权限。
+    </div>
+
+    <h3>2.1 可以安全使用的命令</h3>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>current_block
+get_cells
+get_nets
+get_pins
+get_ports
+get_clocks
+get_scenarios
+get_power_domains
+get_attribute
+sizeof_collection
+report_design
+report_qor
+report_utilization
+report_reference
+report_clocks
+report_scenarios
+report_timing
+puts
+set
+expr</code></pre>
+    </div>
+
+    <p>
+        其中，Tcl 的 <code>set</code> 只是定义当前会话变量，
+        例如：
+    </p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>set cells [get_cells -hierarchical *]</code></pre>
+    </div>
+
+    <p>
+        这不会修改 ICC2 Block，只是把查询结果保存在 Tcl 变量
+        <code>cells</code> 中。
+    </p>
+
+    <h3>2.2 不要在别人目录中写报告</h3>
+
+    <p>
+        如果当前 Linux 工作目录属于别人且不可写，不要执行：
+    </p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>redirect -file report.rpt {
+    report_qor
+}</code></pre>
+    </div>
+
+    <p>
+        因为这会尝试在当前目录创建文件。
+        如果确实需要保存报告，应先切换到自己的可写目录。
+    </p>
+
+    <div class="notice warning">
+        切换 Linux 工作目录不会切换当前 ICC2 Block，
+        也不会改变 Block 的来源路径。
+    </div>
+
+    <h3>2.3 推荐启动方式</h3>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code># Linux Shell 中执行
+mkdir -p ~/icc2_block_analysis
+cd ~/icc2_block_analysis
+
+# 从自己的目录启动 ICC2
+icc2_shell</code></pre>
+    </div>
+
+    <p>
+        然后以只读方式打开目标 Block。不同 ICC2 版本的打开选项可能不同，
+        应通过以下命令确认：
+    </p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>help open_lib
+help open_block</code></pre>
+    </div>
+
+    <div class="notice danger">
+        不要因为 Linux 文件权限显示为可读，就默认 ICC2 Block 已经以只读模式打开。
+        是否只读取决于实际的 Library/Block 打开方式和项目流程。
+    </div>
+</section>
+
+<section>
+    <h2>3. 同时拥有读写权限时应该怎样做</h2>
+
+    <div class="notice info">
+        拥有写权限不代表必须修改设计。
+        如果目的只是评价 Block，仍建议优先使用只读查询命令。
+    </div>
+
+    <h3>3.1 只保存报告，不修改 Block</h3>
+
+    <p>
+        这是最安全、最常见的读写权限使用方式。
+        Block 本身不做修改，只把报告输出到可写目录。
+    </p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code># 在 ICC2 中切换到自己的可写报告目录
+set report_dir ~/icc2_reports
+file mkdir $report_dir
+cd $report_dir
+
+puts "Current directory = [pwd]"
+puts "Directory writable = [file writable [pwd]]"</code></pre>
+    </div>
+
+    <p>输出单个报告：</p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>redirect -file block_qor.rpt {
+    report_qor
+}</code></pre>
+    </div>
+
+    <p>输出其他报告：</p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>redirect -file block_utilization.rpt {
+    report_utilization
+}
+
+redirect -file block_reference.rpt {
+    report_reference
+}
+
+redirect -file block_clocks.rpt {
+    report_clocks
+}
+
+redirect -file block_scenarios.rpt {
+    report_scenarios
+}</code></pre>
+    </div>
+
+    <div class="notice success">
+        <code>redirect -file</code> 只负责保存命令输出，
+        不会因为写了报告文件就修改 ICC2 Block。
+    </div>
+
+    <h3>3.2 如果需要修改设计</h3>
+
+    <p>
+        如果你不仅要报告，还需要执行 placement、CTS、routing、ECO、
+        约束修改或 PG 修改，应采用下面的受控流程：
+    </p>
+
+    <div class="flow">确认修改任务和授权
+        |
+        v
+确认当前 Library 和 Block 的来源
+        |
+        v
+创建独立副本或新的工作 Block
+        |
+        v
+记录修改前的 QoR、Utilization 和 Timing
+        |
+        v
+执行修改脚本
+        |
+        v
+执行检查和前后对比
+        |
+        v
+保存到新的 Block 名称
+        |
+        v
+确认无误后再决定是否更新正式版本</div>
+
+    <h3>3.3 不建议直接覆盖原始 Block</h3>
+
+    <div class="notice danger">
+        即使你有写权限，也不建议第一次实验就直接覆盖 designer 的原始 Block。
+        更安全的方式是创建新版本或使用新的 Block 名称。
+    </div>
+
+    <p>常见思路如下：</p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code># 示例思路，实际语法应以当前 ICC2 版本帮助为准
+set original_block [get_object_name [current_block]]
+
+puts "Original block = $original_block"
+
+# 修改前先保存为新的工作版本
+# 不同 ICC2 版本和项目流程可能使用 save_block -as、
+# copy_block 或项目封装命令。
+
+help save_block
+help copy_block</code></pre>
+    </div>
+
+    <p>
+        如果当前版本支持相应语法，项目中可能采用类似：
+    </p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code># 仅为常见形式，执行前必须查看当前版本帮助
+save_block -as block_name_analysis</code></pre>
+    </div>
+
+    <div class="notice warning">
+        <code>save_block -as</code> 是否可用、目标 Block 写到哪个 Library、
+        是否允许跨 Library 保存，取决于 ICC2 版本和项目 Library 结构。
+        执行前必须检查 <code>help save_block</code>。
+    </div>
+
+    <h3>3.4 修改前后的报告对比</h3>
+
+    <p>修改前：</p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>redirect -file before_qor.rpt {
+    report_qor
+}
+
+redirect -file before_utilization.rpt {
+    report_utilization
+}
+
+redirect -file before_timing_setup.rpt {
+    report_timing -delay_type max -max_paths 50
+}
+
+redirect -file before_timing_hold.rpt {
+    report_timing -delay_type min -max_paths 50
+}</code></pre>
+    </div>
+
+    <p>执行修改后，再生成对应的 after 报告：</p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>redirect -file after_qor.rpt {
+    report_qor
+}
+
+redirect -file after_utilization.rpt {
+    report_utilization
+}
+
+redirect -file after_timing_setup.rpt {
+    report_timing -delay_type max -max_paths 50
+}
+
+redirect -file after_timing_hold.rpt {
+    report_timing -delay_type min -max_paths 50
+}</code></pre>
+    </div>
+
+    <p>在 Linux 中比较：</p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>diff -u before_qor.rpt after_qor.rpt
+diff -u before_utilization.rpt after_utilization.rpt</code></pre>
+    </div>
+
+    <h3>3.5 什么时候才保存 Block？</h3>
+
+    <p>建议至少确认以下项目：</p>
+
+    <ul>
+        <li>脚本没有异常中断</li>
+        <li>Block 名称和目标 Library 正确</li>
+        <li>关键 Cell、Net、PG 和约束没有意外丢失</li>
+        <li>QoR 没有明显恶化</li>
+        <li>Setup/Hold 没有出现不可接受的回退</li>
+        <li>Utilization 和 congestion 没有异常上升</li>
+        <li>项目允许写入该 Block</li>
+    </ul>
+
+    <p>确认后才执行项目规定的保存命令：</p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code># 执行前确认当前 Block
+current_block
+
+# 查看当前版本的准确语法
+help save_block
+help save_lib
+
+# 按项目流程保存
+save_block</code></pre>
+    </div>
+
+    <div class="notice danger">
+        不要在不清楚影响范围时随意执行 <code>save_lib</code>。
+        它可能涉及整个 Design Library，而不仅仅是当前 Block。
+    </div>
+</section>
+
+<section>
+    <h2>4. Block 复杂度应该评价哪些指标</h2>
+
+    <div class="grid">
+        <div class="metric-card">
+            <h3>几何规模</h3>
+            <ul>
+                <li>Block 宽度、高度和面积</li>
+                <li>Core 宽度、高度和面积</li>
+                <li>不规则边界</li>
+                <li>狭窄放置和布线区域</li>
+            </ul>
+        </div>
+
+        <div class="metric-card">
+            <h3>逻辑规模</h3>
+            <ul>
+                <li>Leaf Instance 数量</li>
+                <li>Standard Logic Cell 数量</li>
+                <li>Sequential Cell 数量</li>
+                <li>Combinational Cell 数量</li>
+            </ul>
+        </div>
+
+        <div class="metric-card">
+            <h3>物理规模</h3>
+            <ul>
+                <li>Hard Macro 数量</li>
+                <li>Macro 面积和分布</li>
+                <li>Physical-only Cell 数量</li>
+                <li>Blockage 和 Macro Channel</li>
+            </ul>
+        </div>
+
+        <div class="metric-card">
+            <h3>连接规模</h3>
+            <ul>
+                <li>Net 数量</li>
+                <li>Pin 数量</li>
+                <li>Top-level Port 数量</li>
+                <li>高扇出 Net 和 Pin Density</li>
+            </ul>
+        </div>
+
+        <div class="metric-card">
+            <h3>时序复杂度</h3>
+            <ul>
+                <li>Clock 数量</li>
+                <li>Generated Clock</li>
+                <li>Scenario 数量</li>
+                <li>WNS、TNS 和违例端点</li>
+            </ul>
+        </div>
+
+        <div class="metric-card">
+            <h3>物理实现难度</h3>
+            <ul>
+                <li>Utilization</li>
+                <li>Congestion</li>
+                <li>Macro 周边通道</li>
+                <li>DRC 和 Pin Access</li>
+            </ul>
+        </div>
+
+        <div class="metric-card">
+            <h3>多电压复杂度</h3>
+            <ul>
+                <li>Power Domain 数量</li>
+                <li>Voltage Area 数量</li>
+                <li>Level Shifter 和 Isolation</li>
+                <li>Power Switch、AON 和 Retention</li>
+            </ul>
+        </div>
+
+        <div class="metric-card">
+            <h3>运行资源复杂度</h3>
+            <ul>
+                <li>Mode 和 Corner 数量</li>
+                <li>MCMM Scenario 数量</li>
+                <li>数据库对象数量</li>
+                <li>内存和运行时间</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section>
+    <h2>5. ICC2 常用评估命令汇总</h2>
+
+    <div class="toolbar">
+        <input
+            id="searchBox"
+            type="search"
+            placeholder="搜索指标、命令或说明，例如：instance、macro、utilization">
+
+        <select id="categoryFilter">
+            <option value="all">全部类别</option>
+            <option value="geometry">几何规模</option>
+            <option value="instance">Instance</option>
+            <option value="connectivity">连接规模</option>
+            <option value="timing">时序</option>
+            <option value="physical">物理实现</option>
+            <option value="power">多电压</option>
+        </select>
+
+        <button type="button" onclick="window.print()">
+            打印／导出 PDF
+        </button>
+    </div>
+
+    <div class="table-wrap">
+        <table id="commandTable">
+            <thead>
+                <tr>
+                    <th>评估项目</th>
+                    <th>建议命令</th>
+                    <th>用途</th>
+                    <th>解读重点</th>
+                    <th>只读安全性</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr data-category="geometry">
+                    <td>Block 尺寸</td>
+                    <td>
+                        <code>get_attribute [current_block] bbox</code>
+                    </td>
+                    <td>获取 Block 外接边界</td>
+                    <td>计算宽度、高度和外接面积</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="geometry">
+                    <td>Core 尺寸</td>
+                    <td>
+                        <code>get_attribute [get_core_area] bbox</code>
+                    </td>
+                    <td>获取 Core Area 的边界</td>
+                    <td>反映主要可放置区域规模</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="instance">
+                    <td>全部 Cell Instance</td>
+                    <td>
+                        <code>get_cells -hierarchical *</code>
+                    </td>
+                    <td>统计层次和叶节点 Cell</td>
+                    <td>不等于标准逻辑 Cell 数量</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="instance">
+                    <td>Leaf Instance</td>
+                    <td>
+                        <code>is_hierarchical == false</code>
+                    </td>
+                    <td>统计最底层实例</td>
+                    <td>可能包含 Macro 和 Physical-only Cell</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="instance">
+                    <td>Hierarchical Instance</td>
+                    <td>
+                        <code>is_hierarchical == true</code>
+                    </td>
+                    <td>统计模块层次实例</td>
+                    <td>反映层次结构，不代表实际放置 Cell 数</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="instance">
+                    <td>Sequential Cell</td>
+                    <td>
+                        <code>is_sequential == true</code>
+                    </td>
+                    <td>统计 FF、Latch 等时序单元</td>
+                    <td>可粗略反映 CTS Sink 和 Hold 压力</td>
+                    <td><span class="badge warn">属性需确认</span></td>
+                </tr>
+
+                <tr data-category="instance">
+                    <td>Combinational Cell</td>
+                    <td>
+                        <code>is_combinational == true</code>
+                    </td>
+                    <td>统计组合逻辑 Cell</td>
+                    <td>反映数据路径逻辑规模</td>
+                    <td><span class="badge warn">属性需确认</span></td>
+                </tr>
+
+                <tr data-category="instance">
+                    <td>Hard Macro</td>
+                    <td>
+                        <code>is_hard_macro == true</code>
+                    </td>
+                    <td>统计 SRAM、ROM、PLL、模拟 Macro</td>
+                    <td>数量、面积和位置都会影响 Floorplan</td>
+                    <td><span class="badge warn">属性需确认</span></td>
+                </tr>
+
+                <tr data-category="instance">
+                    <td>Physical-only Cell</td>
+                    <td>
+                        <code>is_physical_only == true</code>
+                    </td>
+                    <td>统计 Filler、Tap、Endcap、Decap</td>
+                    <td>数量高不一定代表逻辑复杂度高</td>
+                    <td><span class="badge warn">属性需确认</span></td>
+                </tr>
+
+                <tr data-category="connectivity">
+                    <td>Net 数量</td>
+                    <td>
+                        <code>get_nets -hierarchical *</code>
+                    </td>
+                    <td>统计逻辑连接网络</td>
+                    <td>反映基本布线规模</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="connectivity">
+                    <td>Pin 数量</td>
+                    <td>
+                        <code>get_pins -hierarchical *</code>
+                    </td>
+                    <td>统计 Instance Pin</td>
+                    <td>通常比 Instance 数更能反映布线需求</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="connectivity">
+                    <td>顶层 Port</td>
+                    <td>
+                        <code>get_ports *</code>
+                    </td>
+                    <td>统计 Block 外部接口</td>
+                    <td>影响边界 Pin 和跨 Block 布线</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="physical">
+                    <td>Utilization</td>
+                    <td>
+                        <code>report_utilization</code>
+                    </td>
+                    <td>报告 Cell Area 与可放置面积比例</td>
+                    <td>必须结合局部拥塞和 Blockage</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="physical">
+                    <td>Reference 分布</td>
+                    <td>
+                        <code>report_reference</code>
+                    </td>
+                    <td>统计各 Master Cell 使用数量</td>
+                    <td>可发现大量 Buffer、Filler 或 Macro</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="physical">
+                    <td>Congestion</td>
+                    <td>
+                        <code>report_congestion</code>
+                    </td>
+                    <td>报告布线拥塞</td>
+                    <td>通常要求已有 Placement 或 Global Route 信息</td>
+                    <td><span class="badge warn">依阶段而定</span></td>
+                </tr>
+
+                <tr data-category="timing">
+                    <td>QoR</td>
+                    <td>
+                        <code>report_qor</code>
+                    </td>
+                    <td>报告 Cell、Area、WNS、TNS 等摘要</td>
+                    <td>需要确认当前启用的 Scenario</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="timing">
+                    <td>Clock 数量</td>
+                    <td>
+                        <code>get_clocks *</code>
+                    </td>
+                    <td>统计时序环境中的 Clock</td>
+                    <td>还需考虑 Generated Clock 和 Clock Domain</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="timing">
+                    <td>Scenario 数量</td>
+                    <td>
+                        <code>get_scenarios *</code>
+                    </td>
+                    <td>统计 MCMM 场景</td>
+                    <td>场景越多，分析和优化成本通常越高</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="timing">
+                    <td>Setup/Hold Timing</td>
+                    <td>
+                        <code>report_timing</code>
+                    </td>
+                    <td>检查最大和最小延迟路径</td>
+                    <td>关注 WNS、路径深度和违例类型</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+
+                <tr data-category="power">
+                    <td>Power Domain</td>
+                    <td>
+                        <code>get_power_domains *</code>
+                    </td>
+                    <td>统计 UPF Power Domain</td>
+                    <td>Domain 越多，跨域和 PG 实现越复杂</td>
+                    <td><span class="badge safe">安全</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p id="resultCount" class="small"></p>
+</section>
+
+<section>
+    <h2>6. 推荐先执行的原生报告</h2>
+
+    <div class="notice info">
+        以下命令适合第一轮了解 Block。
+        在只读 Block 中可以直接输出到 ICC2 终端。
+    </div>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>report_design
+report_qor
+report_utilization
+report_reference
+report_clocks
+report_scenarios
+report_modes
+report_corners</code></pre>
+    </div>
+
+    <h3>快速统计主要对象数量</h3>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>puts "All cells = [sizeof_collection \
+    [get_cells -quiet -hierarchical *]]"
+
+puts "Leaf cells = [sizeof_collection \
+    [get_cells -quiet -hierarchical * \
+    -filter {is_hierarchical == false}]]"
+
+puts "Nets = [sizeof_collection \
+    [get_nets -quiet -hierarchical *]]"
+
+puts "Pins = [sizeof_collection \
+    [get_pins -quiet -hierarchical *]]"
+
+puts "Ports = [sizeof_collection \
+    [get_ports -quiet *]]"
+
+puts "Clocks = [sizeof_collection \
+    [get_clocks -quiet *]]"
+
+puts "Scenarios = [sizeof_collection \
+    [get_scenarios -quiet *]]"</code></pre>
+    </div>
+</section>
+
+<section>
+    <h2>7. Block 和 Core 的尺寸</h2>
+
+    <details open>
+        <summary>7.1 报告 Block 的宽度、高度和外接面积</summary>
+
+        <div class="detail-content">
+            <div class="code-box">
+                <button class="copy-button" onclick="copyCode(this)">复制</button>
+                <pre><code>set blk  [current_block]
+set bbox [get_attribute $blk bbox]
+
+set llx [lindex $bbox 0 0]
+set lly [lindex $bbox 0 1]
+set urx [lindex $bbox 1 0]
+set ury [lindex $bbox 1 1]
+
+set width  [expr {$urx - $llx}]
+set height [expr {$ury - $lly}]
+set area   [expr {$width * $height}]
+
+puts "Block name   = [get_object_name $blk]"
+puts "Block bbox   = $bbox"
+puts "Block width  = $width um"
+puts "Block height = $height um"
+puts "BBox area    = $area um^2"</code></pre>
+            </div>
+
+            <div class="notice warning">
+                如果 Block 是 L 形、阶梯形或其他不规则多边形，
+                <code>width × height</code> 只是外接矩形面积，
+                不等于真实多边形面积。
+            </div>
+        </div>
+    </details>
+
+    <details>
+        <summary>7.2 报告 Core 的宽度、高度和外接面积</summary>
+
+        <div class="detail-content">
+            <p>
+                当前环境中应通过 <code>get_core_area</code> 获取 Core，
+                不使用不存在的 Block <code>core_bbox</code> 属性。
+            </p>
+
+            <div class="code-box">
+                <button class="copy-button" onclick="copyCode(this)">复制</button>
+                <pre><code>set core_obj  [get_core_area]
+set core_bbox [get_attribute $core_obj bbox]
+
+set llx [lindex $core_bbox 0 0]
+set lly [lindex $core_bbox 0 1]
+set urx [lindex $core_bbox 1 0]
+set ury [lindex $core_bbox 1 1]
+
+set width  [expr {$urx - $llx}]
+set height [expr {$ury - $lly}]
+set area   [expr {$width * $height}]
+
+puts "Core bbox   = $core_bbox"
+puts "Core width  = $width um"
+puts "Core height = $height um"
+puts "Core area   = $area um^2"</code></pre>
+            </div>
+        </div>
+    </details>
+</section>
+
+<section>
+    <h2>8. Instance 分类统计</h2>
+
+    <details open>
+        <summary>8.1 All、Hierarchical 和 Leaf Instance</summary>
+
+        <div class="detail-content">
+            <h3>全部 Cell Instance</h3>
+
+            <div class="code-box">
+                <button class="copy-button" onclick="copyCode(this)">复制</button>
+                <pre><code>set all_cells [get_cells -quiet -hierarchical *]
+
+puts "All cell instances = \
+[sizeof_collection $all_cells]"</code></pre>
+            </div>
+
+            <h3>Hierarchical Instance</h3>
+
+            <div class="code-box">
+                <button class="copy-button" onclick="copyCode(this)">复制</button>
+                <pre><code>set hier_cells \
+    [get_cells -quiet -hierarchical * \
+    -filter {is_hierarchical == true}]
+
+puts "Hierarchical instances = \
+[sizeof_collection $hier_cells]"</code></pre>
+            </div>
+
+            <h3>Leaf Instance</h3>
+
+            <div class="code-box">
+                <button class="copy-button" onclick="copyCode(this)">复制</button>
+                <pre><code>set leaf_cells \
+    [get_cells -quiet -hierarchical * \
+    -filter {is_hierarchical == false}]
+
+puts "Leaf instances = \
+[sizeof_collection $leaf_cells]"</code></pre>
+            </div>
+
+            <div class="notice warning">
+                Leaf Instance 通常仍可能包含标准单元、Hard Macro 和
+                Physical-only Cell，因此不能直接等同于标准逻辑 Cell 数量。
+            </div>
+        </div>
+    </details>
+
+    <details>
+        <summary>8.2 Hard Macro 和 Physical-only Cell</summary>
+
+        <div class="detail-content">
+            <h3>Hard Macro</h3>
+
+            <div class="code-box">
+                <button class="copy-button" onclick="copyCode(this)">复制</button>
+                <pre><code>set hard_macros \
+    [get_cells -quiet -hierarchical * \
+    -filter {is_hard_macro == true}]
+
+puts "Hard macros = \
+[sizeof_collection $hard_macros]"</code></pre>
+            </div>
+
+            <p>Hard Macro 可能包括：</p>
+
+            <ul>
+                <li>SRAM、ROM、Register File</li>
+                <li>PLL、模拟 IP</li>
+                <li>PHY、SerDes</li>
+                <li>其他固定物理尺寸的 Macro</li>
+            </ul>
+
+            <h3>Physical-only Cell</h3>
+
+            <div class="code-box">
+                <button class="copy-button" onclick="copyCode(this)">复制</button>
+                <pre><code>set physical_cells \
+    [get_cells -quiet -hierarchical * \
+    -filter {is_physical_only == true}]
+
+puts "Physical-only cells = \
+[sizeof_collection $physical_cells]"</code></pre>
+            </div>
+
+            <p>可能包括：</p>
+
+            <ul>
+                <li>Filler</li>
+                <li>Tap Cell</li>
+                <li>Endcap / Boundary Cell</li>
+                <li>Decap</li>
+                <li>部分 Tie Cell 或 Spare Cell</li>
+            </ul>
+
+            <div class="notice warning">
+                <code>is_hard_macro</code> 和
+                <code>is_physical_only</code> 是否可用，
+                取决于 ICC2 版本、Library 和当前数据库状态。
+            </div>
+
+            <p>如果属性报错，先查看可用属性：</p>
+
+            <div class="code-box">
+                <button class="copy-button" onclick="copyCode(this)">复制</button>
+                <pre><code>list_attributes -application -class cell</code></pre>
+            </div>
+        </div>
+    </details>
+
+    <details>
+        <summary>8.3 Sequential、Combinational 和标准逻辑 Cell</summary>
+
+        <div class="detail-content">
+            <h3>Sequential Cell</h3>
+
+            <div class="code-box">
+                <button class="copy-button" onclick="copyCode(this)">复制</button>
+                <pre><code>set seq_cells \
+    [get_cells -quiet -hierarchical * \
+    -filter {is_sequential == true}]
+
+puts "Sequential cells = \
+[sizeof_collection $seq_cells]"</code></pre>
+            </div>
+
+            <h3>Combinational Cell</h3>
+
+            <div class="code-box">
+                <button class="copy-button" onclick="copyCode(this)">复制</button>
+                <pre><code>set comb_cells \
+    [get_cells -quiet -hierarchical * \
+    -filter {is_combinational == true}]
+
+puts "Combinational cells = \
+[sizeof_collection $comb_cells]"</code></pre>
+            </div>
+
+            <h3>近似标准逻辑 Cell</h3>
+
+            <div class="code-box">
+                <button class="copy-button" onclick="copyCode(this)">复制</button>
+                <pre><code>set std_logic_cells \
+    [get_cells -quiet -hierarchical * \
+    -filter {
+        is_hierarchical == false &amp;&amp;
+        is_physical_only == false &amp;&amp;
+        is_hard_macro == false
+    }]
+
+puts "Standard logic cells = \
+[sizeof_collection $std_logic_cells]"</code></pre>
+            </div>
+
+            <div class="notice info">
+                Sequential Cell 数量通常可粗略反映 Clock Sink 数量、
+                CTS 规模、Clock Power 和 Hold 修复压力。
+            </div>
+        </div>
+    </details>
+</section>
+
+<section>
+    <h2>9. Net、Pin 和 Port 统计</h2>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>set all_nets  [get_nets  -quiet -hierarchical *]
+set all_pins  [get_pins  -quiet -hierarchical *]
+set all_ports [get_ports -quiet *]
+
+puts "Nets  = [sizeof_collection $all_nets]"
+puts "Pins  = [sizeof_collection $all_pins]"
+puts "Ports = [sizeof_collection $all_ports]"</code></pre>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>指标</th>
+                    <th>代表意义</th>
+                    <th>数量高时的可能影响</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td>Net</td>
+                    <td>Instance 和 Port 之间的逻辑连接</td>
+                    <td>布线数量、数据库规模和运行时间增加</td>
+                </tr>
+
+                <tr>
+                    <td>Pin</td>
+                    <td>Cell 的输入、输出、Clock 和控制 Pin</td>
+                    <td>Pin Density、Pin Access 和局部拥塞增加</td>
+                </tr>
+
+                <tr>
+                    <td>Port</td>
+                    <td>Block 对外接口</td>
+                    <td>边界布线和 Pin Placement 更复杂</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="notice info">
+        两个 Block 的 Instance 数量相近时，
+        Pin 数量更多、平均 Pin/Instance 更高的 Block，
+        通常具有更大的布线压力。
+    </div>
+</section>
+
+<section>
+    <h2>10. Utilization 的解读</h2>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>report_utilization</code></pre>
+    </div>
+
+    <p>重点关注：</p>
+
+    <ul>
+        <li>Utilization Ratio</li>
+        <li>Total Capacity Area</li>
+        <li>Total Area of Cells</li>
+        <li>Excluded Area</li>
+        <li>Macro 和 Blockage 对可放置面积的影响</li>
+    </ul>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>全局 Utilization</th>
+                    <th>一般性评价</th>
+                    <th>主要风险</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td>&lt; 60%</td>
+                    <td>通常比较宽松</td>
+                    <td>仍需检查 Macro 通道和 Pin Density</td>
+                </tr>
+
+                <tr>
+                    <td>60%～70%</td>
+                    <td>常见的中等水平</td>
+                    <td>需要检查局部热点</td>
+                </tr>
+
+                <tr>
+                    <td>70%～80%</td>
+                    <td>放置和 ECO 空间开始紧张</td>
+                    <td>合法化、拥塞和 Timing Closure 风险增加</td>
+                </tr>
+
+                <tr>
+                    <td>80%～85%</td>
+                    <td>高密度</td>
+                    <td>Routing、DRC 和 ECO 风险较高</td>
+                </tr>
+
+                <tr>
+                    <td>&gt; 85%</td>
+                    <td>通常属于高风险</td>
+                    <td>是否可实现高度依赖工艺和 Floorplan</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="notice warning">
+        以上只是经验范围，不是项目签核标准。
+        全局 Utilization 不高，并不代表局部区域没有严重拥塞。
+    </div>
+</section>
+
+<section>
+    <h2>11. Clock、Scenario 和时序复杂度</h2>
+
+    <h3>11.1 Clock</h3>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>puts "Clock count = \
+[sizeof_collection [get_clocks -quiet *]]"
+
+report_clocks</code></pre>
+    </div>
+
+    <p>还应考虑：</p>
+
+    <ul>
+        <li>Generated Clock 数量</li>
+        <li>Clock Mux</li>
+        <li>Clock Gating</li>
+        <li>Clock Sink 数量</li>
+        <li>异步 Clock Group</li>
+        <li>跨 Clock Domain 路径</li>
+    </ul>
+
+    <h3>11.2 Scenario</h3>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>puts "Scenario count = \
+[sizeof_collection [get_scenarios -quiet *]]"
+
+report_scenarios
+report_modes
+report_corners</code></pre>
+    </div>
+
+    <h3>11.3 Setup 和 Hold</h3>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>report_qor
+
+report_timing \
+    -delay_type max \
+    -max_paths 10
+
+report_timing \
+    -delay_type min \
+    -max_paths 10</code></pre>
+    </div>
+
+    <div class="notice warning">
+        在评价 WNS/TNS 前，应先确认当前启用的是哪些 Scenario，
+        否则报告结果可能不是目标 Mode 或 Corner。
+    </div>
+</section>
+
+<section>
+    <h2>12. 多电压复杂度</h2>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>set power_domains [get_power_domains -quiet *]
+
+puts "Power domain count = \
+[sizeof_collection $power_domains]"
+
+puts "Power domains = \
+[get_object_name $power_domains]"</code></pre>
+    </div>
+
+    <p>还应检查：</p>
+
+    <ul>
+        <li>Voltage Area 数量和形状</li>
+        <li>Level Shifter 数量和位置</li>
+        <li>Isolation Cell 数量</li>
+        <li>Retention Cell</li>
+        <li>Always-on Cell</li>
+        <li>Power Switch 数量和排列</li>
+        <li>跨 Voltage Area 的信号布线</li>
+        <li>各 Power Domain 的 PG 网络</li>
+    </ul>
+
+    <div class="notice warning">
+        Instance 数量较少的 Block，如果包含多个 Power Domain、
+        不规则 Voltage Area 或复杂 Power Switch，
+        仍可能具有很高的物理实现难度。
+    </div>
+</section>
+
+<section class="card">
+    <h2>13. 一键生成 Block 基础摘要</h2>
+
+    <p>
+        以下 Tcl 只查询当前 Block 并输出到终端，
+        不写文件、不保存 Block，也不修改设计。
+    </p>
+
+    <p>
+        脚本使用 <code>catch</code> 处理版本和属性差异。
+        某项查询失败时显示 <code>N/A</code>，而不是中断整个脚本。
+    </p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code># ============================================================
+# ICC2 READ-ONLY BLOCK COMPLEXITY SUMMARY
+# 只查询并输出到终端，不修改或保存设计
+# ============================================================
+
+proc print_collection_count {label command} {
+    if {[catch {uplevel 1 $command} objects]} {
+        puts [format "%-30s : N/A" $label]
+    } else {
+        puts [format "%-30s : %d" \
+            $label [sizeof_collection $objects]]
+    }
+}
+
+puts "============================================================"
+puts "ICC2 BLOCK COMPLEXITY SUMMARY"
+puts "============================================================"
+
+# ------------------------------------------------------------
+# Current block
+# ------------------------------------------------------------
+
+set blk [current_block]
+
+if {[catch {get_object_name $blk} block_name]} {
+    set block_name "N/A"
+}
+
+puts [format "%-30s : %s" "Block name" $block_name]
+
+# ------------------------------------------------------------
+# Block dimensions
+# ------------------------------------------------------------
+
+if {[catch {get_attribute $blk bbox} block_bbox]} {
+    puts [format "%-30s : N/A" "Block bbox"]
+    puts [format "%-30s : N/A" "Block width"]
+    puts [format "%-30s : N/A" "Block height"]
+    puts [format "%-30s : N/A" "Block bbox area"]
+} else {
+    set llx [lindex $block_bbox 0 0]
+    set lly [lindex $block_bbox 0 1]
+    set urx [lindex $block_bbox 1 0]
+    set ury [lindex $block_bbox 1 1]
+
+    set block_width  [expr {$urx - $llx}]
+    set block_height [expr {$ury - $lly}]
+    set block_area   [expr {$block_width * $block_height}]
+
+    puts [format "%-30s : %s" \
+        "Block bbox" $block_bbox]
+
+    puts [format "%-30s : %.4f um" \
+        "Block width" $block_width]
+
+    puts [format "%-30s : %.4f um" \
+        "Block height" $block_height]
+
+    puts [format "%-30s : %.4f um^2" \
+        "Block bbox area" $block_area]
+}
+
+# ------------------------------------------------------------
+# Core dimensions
+# ------------------------------------------------------------
+
+if {[catch {
+    set core_obj  [get_core_area]
+    set core_bbox [get_attribute $core_obj bbox]
+}]} {
+    puts [format "%-30s : N/A" "Core bbox"]
+    puts [format "%-30s : N/A" "Core width"]
+    puts [format "%-30s : N/A" "Core height"]
+    puts [format "%-30s : N/A" "Core bbox area"]
+} else {
+    set cllx [lindex $core_bbox 0 0]
+    set clly [lindex $core_bbox 0 1]
+    set curx [lindex $core_bbox 1 0]
+    set cury [lindex $core_bbox 1 1]
+
+    set core_width  [expr {$curx - $cllx}]
+    set core_height [expr {$cury - $clly}]
+    set core_area   [expr {$core_width * $core_height}]
+
+    puts [format "%-30s : %s" \
+        "Core bbox" $core_bbox]
+
+    puts [format "%-30s : %.4f um" \
+        "Core width" $core_width]
+
+    puts [format "%-30s : %.4f um" \
+        "Core height" $core_height]
+
+    puts [format "%-30s : %.4f um^2" \
+        "Core bbox area" $core_area]
+}
+
+puts "------------------------------------------------------------"
+puts "INSTANCE COUNTS"
+puts "------------------------------------------------------------"
+
+print_collection_count \
+    "All cell instances" \
+    {get_cells -quiet -hierarchical *}
+
+print_collection_count \
+    "Hierarchical instances" \
+    {get_cells -quiet -hierarchical * \
+        -filter {is_hierarchical == true}}
+
+print_collection_count \
+    "Leaf instances" \
+    {get_cells -quiet -hierarchical * \
+        -filter {is_hierarchical == false}}
+
+print_collection_count \
+    "Hard macros" \
+    {get_cells -quiet -hierarchical * \
+        -filter {is_hard_macro == true}}
+
+print_collection_count \
+    "Physical-only cells" \
+    {get_cells -quiet -hierarchical * \
+        -filter {is_physical_only == true}}
+
+print_collection_count \
+    "Sequential cells" \
+    {get_cells -quiet -hierarchical * \
+        -filter {is_sequential == true}}
+
+print_collection_count \
+    "Combinational cells" \
+    {get_cells -quiet -hierarchical * \
+        -filter {is_combinational == true}}
+
+print_collection_count \
+    "Standard logic cells" \
+    {get_cells -quiet -hierarchical * \
+        -filter {
+            is_hierarchical == false &amp;&amp;
+            is_physical_only == false &amp;&amp;
+            is_hard_macro == false
+        }}
+
+puts "------------------------------------------------------------"
+puts "CONNECTIVITY COUNTS"
+puts "------------------------------------------------------------"
+
+print_collection_count \
+    "Hierarchical nets" \
+    {get_nets -quiet -hierarchical *}
+
+print_collection_count \
+    "Hierarchical pins" \
+    {get_pins -quiet -hierarchical *}
+
+print_collection_count \
+    "Top-level ports" \
+    {get_ports -quiet *}
+
+puts "------------------------------------------------------------"
+puts "TIMING AND POWER ENVIRONMENT"
+puts "------------------------------------------------------------"
+
+print_collection_count \
+    "Clocks" \
+    {get_clocks -quiet *}
+
+print_collection_count \
+    "Scenarios" \
+    {get_scenarios -quiet *}
+
+print_collection_count \
+    "Power domains" \
+    {get_power_domains -quiet *}
+
+puts "============================================================"
+puts "END OF BLOCK COMPLEXITY SUMMARY"
+puts "============================================================"</code></pre>
+    </div>
+</section>
+
+<section class="card">
+    <h2>14. 有写权限时批量保存报告</h2>
+
+    <p>
+        下面的脚本不会修改 Block，但会在指定的可写目录中创建报告文件。
+    </p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code># ============================================================
+# ICC2 REPORT BUNDLE
+# 只生成报告文件，不修改或保存 Block
+# ============================================================
+
+set report_dir ~/icc2_reports
+
+file mkdir $report_dir
+
+if {![file writable $report_dir]} {
+    error "Report directory is not writable: $report_dir"
+}
+
+puts "Report directory = $report_dir"
+
+redirect -file ${report_dir}/design.rpt {
+    report_design
+}
+
+redirect -file ${report_dir}/qor.rpt {
+    report_qor
+}
+
+redirect -file ${report_dir}/utilization.rpt {
+    report_utilization
+}
+
+redirect -file ${report_dir}/reference.rpt {
+    report_reference
+}
+
+redirect -file ${report_dir}/clocks.rpt {
+    report_clocks
+}
+
+redirect -file ${report_dir}/scenarios.rpt {
+    report_scenarios
+}
+
+redirect -file ${report_dir}/modes.rpt {
+    report_modes
+}
+
+redirect -file ${report_dir}/corners.rpt {
+    report_corners
+}
+
+redirect -file ${report_dir}/timing_setup.rpt {
+    report_timing \
+        -delay_type max \
+        -max_paths 50
+}
+
+redirect -file ${report_dir}/timing_hold.rpt {
+    report_timing \
+        -delay_type min \
+        -max_paths 50
+}
+
+puts "Report generation completed."</code></pre>
+    </div>
+
+    <div class="notice warning">
+        <code>report_congestion</code> 是否可用取决于当前设计阶段和数据库状态，
+        因此没有默认放入上面的批量脚本。
+    </div>
+
+    <p>如确认当前设计支持，可单独执行：</p>
+
+    <div class="code-box">
+        <button class="copy-button" onclick="copyCode(this)">复制</button>
+        <pre><code>redirect -file ${report_dir}/congestion.rpt {
+    report_congestion
+}</code></pre>
+    </div>
+</section>
+
+<section>
+    <h2>15. 如何综合判断 Block 的复杂程度</h2>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>指标</th>
+                    <th>复杂度增加的表现</th>
+                    <th>主要影响</th>
+                    <th>注意事项</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td>Leaf Instance</td>
+                    <td>数量增加</td>
+                    <td>Placement、优化和运行时间增加</td>
+                    <td>应排除 Physical-only Cell</td>
+                </tr>
+
+                <tr>
+                    <td>Sequential Cell</td>
+                    <td>FF/Latch 数量增加</td>
+                    <td>CTS、Hold 和 Clock Power 压力增加</td>
+                    <td>还需考虑 Clock Domain 数量</td>
+                </tr>
+
+                <tr>
+                    <td>Hard Macro</td>
+                    <td>数量或面积增加</td>
+                    <td>Floorplan、通道、PG 和拥塞更复杂</td>
+                    <td>位置和 Pin 分布比单纯数量更重要</td>
+                </tr>
+
+                <tr>
+                    <td>Pin 数量</td>
+                    <td>Pin/Instance 比例提高</td>
+                    <td>Pin Access 和 Routing Demand 增加</td>
+                    <td>局部 Pin Density 比总数更重要</td>
+                </tr>
+
+                <tr>
+                    <td>Utilization</td>
+                    <td>可用空间减少</td>
+                    <td>合法化、Routing 和 ECO 难度增加</td>
+                    <td>必须结合局部 Utilization</td>
+                </tr>
+
+                <tr>
+                    <td>Clock</td>
+                    <td>Clock Domain 和 Generated Clock 增加</td>
+                    <td>CTS、CDC 和跨时钟分析更复杂</td>
+                    <td>还需考虑 Sink 和 Clock Mux</td>
+                </tr>
+
+                <tr>
+                    <td>Scenario</td>
+                    <td>Mode/Corner 组合增加</td>
+                    <td>MCMM 分析和优化时间增加</td>
+                    <td>注意哪些 Scenario 处于 Active 状态</td>
+                </tr>
+
+                <tr>
+                    <td>Power Domain</td>
+                    <td>Voltage Domain 增加</td>
+                    <td>LS、ISO、PSW、AON 和 PG 更复杂</td>
+                    <td>还要看 Voltage Area 形状</td>
+                </tr>
+
+                <tr>
+                    <td>Congestion</td>
+                    <td>Hotspot 和 Overflow 增加</td>
+                    <td>Routing、Timing、SI 和 DRC 风险增加</td>
+                    <td>重点检查 Macro Channel 和 Pin Access</td>
+                </tr>
+
+                <tr>
+                    <td>WNS/TNS</td>
+                    <td>负值扩大、违例端点增加</td>
+                    <td>Timing Closure 难度增加</td>
+                    <td>必须确认 PVT、OCV 和 Clock 状态</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="card">
+    <h2>16. 常见误区</h2>
+
+    <div class="notice warning">
+        <strong>误区一：</strong>
+        Instance 多的 Block 一定更难实现。<br>
+        实际上 Macro、Pin Density、Clock、Power Domain 和 Congestion
+        都会显著影响实现难度。
+    </div>
+
+    <div class="notice warning">
+        <strong>误区二：</strong>
+        Leaf Cell 数量就是标准单元数量。<br>
+        Leaf Cell 可能包含 Macro、Filler、Tap、Endcap 和 Decap。
+    </div>
+
+    <div class="notice warning">
+        <strong>误区三：</strong>
+        全局 Utilization 不高就不会拥塞。<br>
+        Macro 周边、狭窄通道、Voltage Area 边界和高 Pin Density 区域
+        仍可能出现严重拥塞。
+    </div>
+
+    <div class="notice warning">
+        <strong>误区四：</strong>
+        有写权限就可以直接修改原始 Block。<br>
+        写权限只是技术条件，是否允许修改还取决于项目授权和版本管理规则。
+    </div>
+
+    <div class="notice warning">
+        <strong>误区五：</strong>
+        <code>source</code> 只是打开 Tcl 文件。<br>
+        实际上 <code>source</code> 会执行脚本中的全部命令，
+        可能修改约束、对象属性或物理数据库。
+    </div>
+
+    <div class="notice warning">
+        <strong>误区六：</strong>
+        执行了修改但没有 <code>save_block</code>，就完全没有影响。<br>
+        修改虽然可能尚未写入磁盘，但当前 ICC2 会话中的数据库状态已经改变，
+        后续报告和操作都会基于修改后的状态。
+    </div>
+</section>
+
+<section class="card">
+    <h2>17. 最推荐的工作流程</h2>
+
+    <h3>只有读取权限</h3>
+
+    <ol>
+        <li>从自己的可写目录启动 ICC2。</li>
+        <li>以只读方式打开目标 Library 和 Block。</li>
+        <li>执行一键统计脚本。</li>
+        <li>执行 <code>report_qor</code>、<code>report_utilization</code> 等原生报告。</li>
+        <li>结果只显示在终端，或者输出到自己的可写目录。</li>
+        <li>不要执行修改、导入和保存命令。</li>
+    </ol>
+
+    <h3>同时拥有读写权限，但只做评价</h3>
+
+    <ol>
+        <li>仍然优先使用查询和报告命令。</li>
+        <li>在自己的报告目录中保存报告。</li>
+        <li>不需要执行 <code>save_block</code>。</li>
+        <li>保存报告不会修改 Block。</li>
+    </ol>
+
+    <h3>同时拥有读写权限，并且需要修改设计</h3>
+
+    <ol>
+        <li>确认项目授权和目标 Block。</li>
+        <li>创建独立工作副本或新版本 Block。</li>
+        <li>保存修改前的 QoR、Timing、Utilization 和关键统计。</li>
+        <li>执行修改脚本。</li>
+        <li>检查错误、Timing、Congestion、DRC 和设计完整性。</li>
+        <li>生成修改后的报告并与修改前比较。</li>
+        <li>确认目标 Library 和 Block 名称正确。</li>
+        <li>按照项目流程保存新的 Block 版本。</li>
+        <li>不要在未确认时覆盖原始正式 Block。</li>
+    </ol>
+
+    <div class="notice success">
+        <strong>实用结论：</strong>
+        第一轮评价建议使用
+        <code>report_qor</code>、
+        <code>report_utilization</code>、
+        <code>report_reference</code>
+        和一键统计脚本；第二轮再分析 Timing、Congestion、Clock、
+        Scenario 和多电压结构。
+    </div>
+</section>
+
+</main>
+
+<footer>
+<div class="container">
+    <p>
+        <strong>ICC2 Block 规模与复杂度评估指南</strong>
+    </p>
+
+    <p>
+        重点：只读查询、读写权限管理、Instance 分类、几何规模、
+        Utilization、Timing、Congestion 和多电压复杂度。
+    </p>
+</div>
+</footer>
+
+<script>
+(function () {
+    const searchBox = document.getElementById("searchBox");
+    const categoryFilter = document.getElementById("categoryFilter");
+
+    const rows = Array.from(
+        document.querySelectorAll("#commandTable tbody tr")
+    );
+
+    const resultCount = document.getElementById("resultCount");
+
+    function filterRows() {
+        const keyword =
+            searchBox.value.trim().toLowerCase();
+
+        const category =
+            categoryFilter.value;
+
+        let visibleCount = 0;
+
+        rows.forEach(function (row) {
+            const text =
+                row.textContent.toLowerCase();
+
+            const rowCategory =
+                row.dataset.category;
+
+            const keywordMatched =
+                keyword === "" ||
+                text.includes(keyword);
+
+            const categoryMatched =
+                category === "all" ||
+                rowCategory === category;
+
+            const visible =
+                keywordMatched &&
+                categoryMatched;
+
+            row.classList.toggle(
+                "hidden",
+                !visible
+            );
+
+            if (visible) {
+                visibleCount++;
+            }
+        });
+
+        resultCount.textContent =
+            "当前显示 " +
+            visibleCount +
+            " / " +
+            rows.length +
+            " 个评估项目。";
+    }
+
+    searchBox.addEventListener(
+        "input",
+        filterRows
+    );
+
+    categoryFilter.addEventListener(
+        "change",
+        filterRows
+    );
+
+    filterRows();
+})();
+
+function copyCode(button) {
+    const code =
+        button.parentElement
+            .querySelector("pre code")
+            .innerText;
+
+    navigator.clipboard
+        .writeText(code)
+        .then(function () {
+            const originalText =
+                button.textContent;
+
+            button.textContent =
+                "已复制";
+
+            setTimeout(function () {
+                button.textContent =
+                    originalText;
+            }, 1500);
+        })
+        .catch(function () {
+            button.textContent =
+                "复制失败";
+        });
+}
+</script>
+
+</body>
+</html>
